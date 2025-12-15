@@ -85,7 +85,6 @@ function ibg(){
 }
 ibg();
 
-//================================================
 
 const heder = document.getElementById('elem');
 

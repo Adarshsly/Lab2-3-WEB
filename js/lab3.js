@@ -161,44 +161,77 @@ function applyFilters() {
     updateFilterAvailability();
 }
 
-// ============ ОБНОВЛЕНИЕ ДОСТУПНОСТИ ФИЛЬТРОВ (УМНЫЙ ФИЛЬТР) ============
+// ============ УМНЫЙ ФИЛЬТР ============
 function updateFilterAvailability() {
     updateActiveFilters();
     
-    // Получаем все возможные значения фильтров
-    const allTypes = [...new Set(projects.map(p => p.type))];
-    const allYears = [...new Set(projects.map(p => p.year))];
-    const allStatuses = [...new Set(projects.map(p => p.status))];
+    const currentMatchingProjects = projects.filter(project => {
+        if (activeFilters.type.length > 0 && !activeFilters.type.includes(project.type)) return false;
+        if (activeFilters.year.length > 0 && !activeFilters.year.includes(project.year)) return false;
+        if (activeFilters.status.length > 0 && !activeFilters.status.includes(project.status)) return false;
+        return true;
+    });
     
-    // Для каждого чекбокса проверяем, есть ли хоть один проект с такой комбинацией
+    if (currentMatchingProjects.length === 0) {
+        document.querySelectorAll('#filters-container input[type="checkbox"]').forEach(checkbox => {
+            checkbox.disabled = false;
+            checkbox.parentElement.style.opacity = "1";
+            checkbox.parentElement.style.cursor = "pointer";
+        });
+        return;
+    }
+    
+    const availableValuesFromFiltered = {
+        type: new Set(),
+        year: new Set(),
+        status: new Set()
+    };
+    
+    currentMatchingProjects.forEach(project => {
+        availableValuesFromFiltered.type.add(project.type);
+        availableValuesFromFiltered.year.add(project.year);
+        availableValuesFromFiltered.status.add(project.status);
+    });
+    
     document.querySelectorAll('#filters-container input[type="checkbox"]').forEach(checkbox => {
         const filterName = checkbox.name;
         const value = checkbox.value;
-        let isPossible = false;
-        
-        // Создаем тестовый набор фильтров
-        const testFilters = JSON.parse(JSON.stringify(activeFilters));
-        
-        // Если этот чекбокс уже выбран, он всегда доступен
         if (checkbox.checked) {
-            isPossible = true;
-        } else {
-            // Добавляем это значение к текущим фильтрам
-            testFilters[filterName] = [...testFilters[filterName], value];
-            
-            // Проверяем, есть ли хоть один проект, удовлетворяющий этим фильтрам
-            isPossible = projects.some(project => {
-                if (testFilters.type.length > 0 && !testFilters.type.includes(project.type)) return false;
-                if (testFilters.year.length > 0 && !testFilters.year.includes(project.year)) return false;
-                if (testFilters.status.length > 0 && !testFilters.status.includes(project.status)) return false;
-                return true;
-            });
+            checkbox.disabled = false;
+            checkbox.parentElement.style.opacity = "1";
+            checkbox.parentElement.style.cursor = "pointer";
+            return;
         }
         
-        checkbox.disabled = !isPossible;
-        // Меняем стиль label
+        const isValueAvailable = availableValuesFromFiltered[filterName].has(value);
+        
+        const testFilters = {
+            type: [...activeFilters.type],
+            year: [...activeFilters.year],
+            status: [...activeFilters.status]
+        };
+        testFilters[filterName].push(value);
+        
+        let hasProjectWithCombination = false;
+        for (let project of projects) {
+            let matches = true;
+            
+            if (testFilters.type.length > 0 && !testFilters.type.includes(project.type)) matches = false;
+            if (testFilters.year.length > 0 && !testFilters.year.includes(project.year)) matches = false;
+            if (testFilters.status.length > 0 && !testFilters.status.includes(project.status)) matches = false;
+            
+            if (matches) {
+                hasProjectWithCombination = true;
+                break;
+            }
+        }
+        
+        const isAvailable = isValueAvailable && hasProjectWithCombination;
+        
+        checkbox.disabled = !isAvailable;
         const label = checkbox.parentElement;
-        if (isPossible) {
+        
+        if (isAvailable) {
             label.style.opacity = "1";
             label.style.cursor = "pointer";
         } else {
@@ -223,7 +256,6 @@ function resetFilters() {
     
     renderProjects(projects);
     
-    // Сбрасываем стили labels
     document.querySelectorAll('#filters-container label').forEach(label => {
         label.style.opacity = "1";
         label.style.cursor = "pointer";
@@ -236,7 +268,6 @@ function togglePrintMode() {
     const isPrintMode = document.body.classList.toggle('print-mode');
     
     if (isPrintMode) {
-        // Включаем печатные стили
         const printStyle = document.createElement('style');
         printStyle.id = 'print-style';
         printStyle.textContent = `
@@ -270,7 +301,6 @@ function togglePrintMode() {
         
          window.print();
     } else {
-        // Отключаем печатные стили
         const printStyle = document.getElementById('print-style');
         if (printStyle) printStyle.remove();
         printBtn.textContent = 'Print Mode';
